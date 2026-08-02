@@ -35,6 +35,9 @@ jobs:
         env:
           NEXT_PUBLIC_BASE_PATH: /ASL-CV
 
+      - name: Copy .nojekyll to out
+        run: cp public/.nojekyll out/.nojekyll
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
