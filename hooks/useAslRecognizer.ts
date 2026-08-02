@@ -1,12 +1,9 @@
-"use client";
-
-import { useEffect, useRef, useState, useCallback } from "react";
-import * as tf from "@tensorflow/tfjs-core";
-import "@tensorflow/tfjs-backend-webgl";
+import { useEffect, useRef, useState, useCallback } from 'react';
+import type { RefObject } from 'react';
 
 const CONFIDENCE_THRESHOLD = 0.8;
 const CONSECUTIVE_FRAMES_REQUIRED = 10;
-const MEDIAPIPE_CDN = "https://cdn.jsdelivr.net/npm/@mediapipe/hands";
+const MEDIAPIPE_CDN = 'https://cdn.jsdelivr.net/npm/@mediapipe/hands';
 
 export interface Prediction {
   letter: string;
@@ -14,8 +11,8 @@ export interface Prediction {
 }
 
 export interface AslRecognizerResult {
-  videoRef: React.RefObject<HTMLVideoElement>;
-  canvasRef: React.RefObject<HTMLCanvasElement>;
+  videoRef: RefObject<HTMLVideoElement>;
+  canvasRef: RefObject<HTMLCanvasElement>;
   confirmedLetter: string;
   currentPrediction: Prediction | null;
   isLoading: boolean;
@@ -26,16 +23,16 @@ export interface AslRecognizerResult {
 export function useAslRecognizer(): AslRecognizerResult {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const cameraRef = useRef<any>(null);
-  const handsRef = useRef<any>(null);
-  const gestureEstimatorRef = useRef<any>(null);
+  const cameraRef = useRef<unknown>(null);
+  const handsRef = useRef<unknown>(null);
+  const gestureEstimatorRef = useRef<unknown>(null);
   const frameBufferRef = useRef<string[]>([]);
-  const lastConfirmedRef = useRef<string>("");
+  const lastConfirmedRef = useRef<string>('');
 
-  const [confirmedLetter, setConfirmedLetter] = useState("");
+  const [confirmedLetter, setConfirmedLetter] = useState('');
   const [currentPrediction, setCurrentPrediction] = useState<Prediction | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [loadingStage, setLoadingStage] = useState("Initializing...");
+  const [loadingStage, setLoadingStage] = useState('Initializing...');
   const [error, setError] = useState<string | null>(null);
 
   const pushToBuffer = useCallback((letter: string, confidence: number) => {
@@ -55,34 +52,41 @@ export function useAslRecognizer(): AslRecognizerResult {
     }
   }, []);
 
-  const runFingerpose = useCallback((landmarks: any[]) => {
-    const ge = gestureEstimatorRef.current;
+  const runFingerpose = useCallback((landmarks: Array<{ x: number; y: number; z: number }>) => {
+    const ge = gestureEstimatorRef.current as {
+      estimate: (lm: number[][], score: number) => { gestures: Array<{ name: string; score: number }> };
+    } | null;
     if (!ge) return;
     try {
-      // fingerpose expects landmarks as array of [x, y, z] arrays
-      const lmArray = landmarks.map((lm: any) => [lm.x * 1000, lm.y * 1000, lm.z * 1000]);
+      // fingerpose expects [[x, y, z], ...] scaled to pixel-like coords
+      const lmArray = landmarks.map((lm) => [
+        lm.x * 640,
+        lm.y * 480,
+        (lm.z ?? 0) * 640,
+      ]);
       const result = ge.estimate(lmArray, 8.5);
-      if (result.gestures && result.gestures.length > 0) {
-        const best = result.gestures.reduce((a: any, b: any) =>
-          a.score > b.score ? a : b
-        );
+      if (result.gestures.length > 0) {
+        const best = result.gestures.reduce((a, b) => (a.score > b.score ? a : b));
         const confidence = Math.min(best.score / 10, 1.0);
         setCurrentPrediction({ letter: best.name, confidence });
         pushToBuffer(best.name, confidence);
       } else {
         setCurrentPrediction(null);
         frameBufferRef.current = [];
-        lastConfirmedRef.current = "";
+        lastConfirmedRef.current = '';
       }
     } catch (_) {
-      // silent fail on estimation errors
+      // silent
     }
   }, [pushToBuffer]);
 
-  const onHandsResults = useCallback((results: any) => {
+  const onHandsResults = useCallback((results: {
+    image: CanvasImageSource;
+    multiHandLandmarks?: Array<Array<{ x: number; y: number; z: number }>>;
+  }) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
     ctx.save();
@@ -92,23 +96,20 @@ export function useAslRecognizer(): AslRecognizerResult {
     ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
     ctx.restore();
 
-    if (results.multiHandLandmarks?.length > 0) {
+    if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
       const landmarks = results.multiHandLandmarks[0];
       runFingerpose(landmarks);
 
-      // Draw skeleton overlay
+      // Draw skeleton
+      const CONNECTIONS: [number, number][] = [
+        [0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],
+        [0,9],[9,10],[10,11],[11,12],[0,13],[13,14],[14,15],[15,16],
+        [0,17],[17,18],[18,19],[19,20],[5,9],[9,13],[13,17],
+      ];
       ctx.save();
       ctx.translate(canvas.width, 0);
       ctx.scale(-1, 1);
-      const CONNECTIONS = [
-        [0,1],[1,2],[2,3],[3,4],
-        [0,5],[5,6],[6,7],[7,8],
-        [0,9],[9,10],[10,11],[11,12],
-        [0,13],[13,14],[14,15],[15,16],
-        [0,17],[17,18],[18,19],[19,20],
-        [5,9],[9,13],[13,17]
-      ];
-      ctx.strokeStyle = "rgba(0,255,170,0.5)";
+      ctx.strokeStyle = 'rgba(0,255,170,0.5)';
       ctx.lineWidth = 2;
       CONNECTIONS.forEach(([a, b]) => {
         ctx.beginPath();
@@ -116,16 +117,16 @@ export function useAslRecognizer(): AslRecognizerResult {
         ctx.lineTo(landmarks[b].x * canvas.width, landmarks[b].y * canvas.height);
         ctx.stroke();
       });
-      landmarks.forEach((lm: any, i: number) => {
+      landmarks.forEach((lm, i) => {
         ctx.beginPath();
         ctx.arc(lm.x * canvas.width, lm.y * canvas.height, i === 0 ? 6 : 3, 0, 2 * Math.PI);
-        ctx.fillStyle = i === 0 ? "#ffffff" : "#00FFAA";
+        ctx.fillStyle = i === 0 ? '#ffffff' : '#00FFAA';
         ctx.fill();
       });
       ctx.restore();
     } else {
       frameBufferRef.current = [];
-      lastConfirmedRef.current = "";
+      lastConfirmedRef.current = '';
       setCurrentPrediction(null);
     }
   }, [runFingerpose]);
@@ -135,20 +136,14 @@ export function useAslRecognizer(): AslRecognizerResult {
 
     async function init() {
       try {
-        setLoadingStage("Setting up WebGL...");
-        await tf.setBackend("webgl");
-        await tf.ready();
+        setLoadingStage('Loading gesture engine...');
+        const fp = await import('fingerpose');
+        const { ASL_GESTURES } = await import('../lib/aslGestures');
+        gestureEstimatorRef.current = new fp.GestureEstimator(ASL_GESTURES);
 
-        // Load fingerpose gesture estimator (no model download needed)
-        setLoadingStage("Loading gesture definitions...");
-        const fp = await import("fingerpose");
-        const { ASL_GESTURES } = await import("../lib/aslGestures");
-        const ge = new fp.GestureEstimator(ASL_GESTURES);
-        gestureEstimatorRef.current = ge;
-
-        setLoadingStage("Starting MediaPipe Hands...");
-        const { Hands } = await import("@mediapipe/hands");
-        const { Camera } = await import("@mediapipe/camera_utils");
+        setLoadingStage('Starting MediaPipe Hands...');
+        const { Hands } = await import('@mediapipe/hands');
+        const { Camera } = await import('@mediapipe/camera_utils');
 
         const hands = new Hands({
           locateFile: (file: string) => `${MEDIAPIPE_CDN}/${file}`,
@@ -159,15 +154,16 @@ export function useAslRecognizer(): AslRecognizerResult {
           minDetectionConfidence: 0.7,
           minTrackingConfidence: 0.6,
         });
-        hands.onResults(onHandsResults);
+        hands.onResults(onHandsResults as (results: unknown) => void);
         handsRef.current = hands;
 
-        if (!videoRef.current) throw new Error("Video element not found");
+        if (!videoRef.current) throw new Error('Video element not found');
 
-        setLoadingStage("Starting camera...");
+        setLoadingStage('Starting camera...');
         const camera = new Camera(videoRef.current, {
           onFrame: async () => {
-            if (videoRef.current) await hands.send({ image: videoRef.current });
+            const h = handsRef.current as { send: (o: { image: HTMLVideoElement }) => Promise<void> } | null;
+            if (videoRef.current && h) await h.send({ image: videoRef.current });
           },
           width: 640,
           height: 480,
@@ -176,9 +172,9 @@ export function useAslRecognizer(): AslRecognizerResult {
         cameraRef.current = camera;
 
         if (!cancelled) setIsLoading(false);
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (!cancelled) {
-          setError(err?.message ?? "Initialization failed");
+          setError(err instanceof Error ? err.message : 'Initialization failed');
           setIsLoading(false);
         }
       }
@@ -187,8 +183,8 @@ export function useAslRecognizer(): AslRecognizerResult {
     init();
     return () => {
       cancelled = true;
-      cameraRef.current?.stop();
-      handsRef.current?.close();
+      (cameraRef.current as { stop?: () => void } | null)?.stop?.();
+      (handsRef.current as { close?: () => void } | null)?.close?.();
     };
   }, [onHandsResults]);
 

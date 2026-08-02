@@ -11,10 +11,8 @@
   "dependencies": {
     "@mediapipe/hands": "^0.4.1646424915",
     "@mediapipe/camera_utils": "^0.3.1675466862",
-    "@tensorflow-models/hand-pose-detection": "^2.0.1",
     "@tensorflow/tfjs-core": "^4.20.0",
     "@tensorflow/tfjs-backend-webgl": "^4.20.0",
-    "@tensorflow/tfjs-converter": "^4.20.0",
     "fingerpose": "^0.1.0",
     "next": "14.2.5",
     "react": "^18.3.1",
