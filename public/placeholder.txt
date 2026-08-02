@@ -1,0 +1,4 @@
+ASL-CV Model Directory
+======================
+Place your TensorFlow.js model files in /public/model/
+See /public/model/.gitkeep for instructions.
