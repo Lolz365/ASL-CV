@@ -1,9 +1,12 @@
 /** @type {import('next').NextConfig} */
+const isProd = process.env.NODE_ENV === 'production';
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+
 const nextConfig = {
-  // Static HTML export for GitHub Pages hosting
   output: 'export',
   trailingSlash: true,
-  // Required for MediaPipe WASM files to be served correctly
+  basePath: basePath,
+  assetPrefix: basePath,
   webpack: (config) => {
     config.resolve.fallback = {
       ...config.resolve.fallback,
@@ -12,7 +15,6 @@ const nextConfig = {
     };
     return config;
   },
-  // Disable image optimization for static export
   images: {
     unoptimized: true,
   },

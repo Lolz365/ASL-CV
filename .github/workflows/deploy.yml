@@ -26,16 +26,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: "npm"
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install --legacy-peer-deps
 
       - name: Build static export
         run: npm run build
         env:
-          # Required if deploying to a subpath like username.github.io/ASL-CV
-          # Change to your actual repo name
           NEXT_PUBLIC_BASE_PATH: /ASL-CV
 
       - name: Upload Pages artifact
